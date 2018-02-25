@@ -1,0 +1,9 @@
+<body>
+    {% include "common/nav.j2" %}
+    <div class="container main-container">
+        {% block content %}
+        {% endblock %}
+    </div>
+    {% block post_includes %}
+    {% endblock %}
+</body>

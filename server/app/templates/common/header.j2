@@ -1,0 +1,10 @@
+{% block header %}
+    <head>
+        <link rel="stylesheet" href="{{ url_for("static", filename="css/bootstrap.min.css") }}" />
+        <link rel="stylesheet" href="{{ url_for("static", filename="css/main.css") }}" />
+        <script src="{{ url_for("static", filename="js/bootstrap.min.js") }}"></script>
+        <title>{% block title %}{% endblock %}</title>
+        {% block header_includes %}
+        {% endblock %}
+    </head>
+{% endblock %}
