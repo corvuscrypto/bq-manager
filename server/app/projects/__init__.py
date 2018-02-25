@@ -2,10 +2,10 @@
 Module for project manipulation and such
 """
 import logging
-from bq_manager.utils.google import get_client
-from bq_manager.utils.decorators import render
+from app.utils.google import get_client
+from app.utils.decorators import render
 from flask import Blueprint
-from bq_manager.projects.dashboard import add_routes
+from app.projects.dashboard import add_routes
 
 
 logger = logging.getLogger(__name__)

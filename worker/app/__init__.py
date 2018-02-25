@@ -4,10 +4,12 @@ from BQ periodically.
 """
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from app.models.dataset import Dataset
+from app.models.internal import InternalState
 from app.models.project import Project
 from app.models.table import Table
 from google.cloud.bigquery import Client
 import time
+import datetime
 import logging
 from app.connection import initialize
 
@@ -121,8 +123,21 @@ def update_tables():
 
 
 def main_loop():
+
+    # check if internal status is there
+    state = InternalState.objects.first()
+    if state is None:
+        state = InternalState()
+        state.save()
     while True:
+        state.update(
+            status="updating",
+            last_refresh=datetime.datetime.now()
+        )
         update_projects()
         update_datasets()
         update_tables()
+        state.update(
+            status="idle",
+        )
         time.sleep(30 * 60)

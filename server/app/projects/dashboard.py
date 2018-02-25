@@ -2,8 +2,8 @@
 Functions and views for the project dashboard
 """
 from flask import jsonify
-from bq_manager.utils.decorators import render
-from bq_manager.utils.google import get_client
+from app.utils.decorators import render
+from app.utils.google import get_client
 import logging
 
 

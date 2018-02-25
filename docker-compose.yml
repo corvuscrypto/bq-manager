@@ -1,0 +1,23 @@
+version: "3"
+services:
+  bq_stats:
+    build:
+      context: ./worker
+    image: "bq_stats:latest"
+    environment:
+      - "MONGO_HOST=mongo"
+    depends_on:
+      - "mongo"
+
+  bq_manager:
+    build:
+      context: ./server
+    image: "bq_manager:latest"
+    environment:
+      - "MONGO_HOST=mongo"
+    depends_on:
+      - "mongo"
+  mongo:
+    image: mongo:3.6
+    ports:
+      - "27012:27017"
