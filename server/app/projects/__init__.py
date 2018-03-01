@@ -30,7 +30,7 @@ def index():
     Index of the manager web interface
     which shows the available projects
     """
-    logger.error("getting projects")
+
     return {
         "projects": get_projects()
     }

@@ -3,7 +3,7 @@
     <div class="mx-auto project-list">
         <h2>Select a Project</h2>
         {% for project in projects %}
-            <a href="{{ url_for("bq_manager.projects.dashboard", project=project.friendly_name) }}", class="btn btn-primary">{{ project.friendly_name }}</a>
+            <a href="{{ url_for("app.projects.dashboard", project=project.friendly_name) }}", class="btn btn-primary">{{ project.friendly_name }}</a>
             <br/>
         {% endfor %}
     </div>

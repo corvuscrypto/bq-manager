@@ -1,0 +1,13 @@
+Go to the following link in your browser:
+
+    https://accounts.google.com/o/oauth2/auth?redirect_uri=urn%3Aietf%3Awg%3Aoauth%3A2.0%3Aoob&prompt=select_account&response_type=code&client_id=764086051850-6qr4p6gpi6hn506pt8ejuq83di341hur.apps.googleusercontent.com&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform&access_type=offline
+
+
+ERROR: gcloud crashed (IOError): [Errno 5] Input/output error
+
+If you would like to report this issue, please run the following command:
+  gcloud feedback
+
+To check gcloud for common problems, please run the following command:
+  gcloud info --run-diagnostics
+Enter verification code: 
