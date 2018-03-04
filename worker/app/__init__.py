@@ -7,21 +7,43 @@ from app.models.dataset import Dataset
 from app.models.internal import InternalState
 from app.models.project import Project
 from app.models.table import Table
+from app.credentials import get_credentials
 from google.cloud.bigquery import Client
 import time
 import datetime
-import logging
-from app.connection import initialize
+from structlog import get_logger
+from app.connection import initialize as init_conn
+from app.log_config import initialize as init_logger
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
+CLIENT = None
 
 
-initialize()
+def get_client():
+    global CLIENT
+    if CLIENT is None:
+        logger.info("Obtaining credentials")
+        credentials = get_credentials()
+        while credentials is None:
+            logger.debug("Credentials not found, retrying in 10s")
+            time.sleep(10)
+            credentials = get_credentials()
+        logger.info("Instantiating Google client")
+        CLIENT = Client(project="", credentials=credentials)
+    return CLIENT
+
+
+def initialize():
+    init_logger()
+    logger.info("Initializing Mongo Connection")
+    init_conn()
+    logger.info("Starting main program loop")
+    main_loop()
 
 
 def update_projects():
-    client = Client()
+    client = get_client()
     projects = client.list_projects()
     for project in projects:
         name = project.friendly_name
@@ -34,7 +56,7 @@ def update_projects():
 
 
 def update_datasets():
-    client = Client()
+    client = get_client()
     projects = Project.objects
     for project in projects:
         client.project = project.name
@@ -72,7 +94,7 @@ def get_table(client, table_ref):
 
 
 def update_tables():
-    client = Client()
+    client = get_client()
     datasets = Dataset.objects
     project_name_by_id = {x.id: x.name for x in Project.objects}
     for dataset in datasets:
@@ -134,10 +156,14 @@ def main_loop():
             status="updating",
             last_refresh=datetime.datetime.now()
         )
+        logger.info("updating projects")
         update_projects()
+        logger.info("updating datasets")
         update_datasets()
+        logger.info("updating tables")
         update_tables()
         state.update(
             status="idle",
         )
+        logger.info("sleeping for 30 minutes")
         time.sleep(30 * 60)
