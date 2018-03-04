@@ -17,6 +17,8 @@ services:
       - "MONGO_HOST=mongo"
     depends_on:
       - "mongo"
+    ports:
+      - "5000:5000"
   mongo:
     image: mongo:3.6
     ports:
