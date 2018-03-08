@@ -4,13 +4,13 @@ code separation.
 """
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from google.api_core.exceptions import NotFound
 from structlog import get_logger
 
 from app.google import get_client
 from bq_models.dataset import Dataset
 from bq_models.project import Project
 from bq_models.table import Table
-
 
 logger = get_logger(__name__)
 
@@ -22,10 +22,21 @@ def update_projects():
         name = project.friendly_name
         project_obj = Project.objects(name=name).first()
         if project_obj is None:
-            logger.info("Adding project")
             project_obj = Project(name=name)
             project_obj.save()
+            logger.info("Added project", project=name)
     logger.info("Project info updated")
+
+
+def list_datasets(client):
+    bq_datasets = client.list_datasets().__iter__()
+    try:
+        first = next(bq_datasets)
+    except NotFound:
+        raise StopIteration
+    yield first
+    for dataset in bq_datasets:
+        yield dataset
 
 
 def update_datasets():
@@ -33,11 +44,16 @@ def update_datasets():
     projects = Project.objects
     for project in projects:
         client.project = project.name
+        logger.info("fetching datasets for project", project=project.name)
         current_datasets = {
             x.name: x
             for x in Dataset.objects(project=project.id)
         }
-        bq_datasets = client.list_datasets()
+
+        # set of the keys that will in the end be used to
+        # know which datasets are removed
+        to_delete = {x for x in current_datasets.keys()}
+        bq_datasets = list_datasets(client)
         for dataset in bq_datasets:
             dataset = client.get_dataset(dataset)
             data = {
@@ -51,13 +67,18 @@ def update_datasets():
                     **data
                 )
                 obj.save()
-                logger.info("Added dataset %s", dataset.dataset_id)
+                logger.info("Added dataset", dataset=dataset.dataset_id)
             else:
+                # remove from delete set
+                to_delete.remove(data['name'])
                 obj = current_datasets[dataset.dataset_id]
                 obj.update(**data)
-                logger.info("Updated dataset %s", dataset.dataset_id)
-
-        logger.info("updated datasets for project %s", project.name)
+                logger.info("Updated dataset", dataset=dataset.dataset_id)
+        logger.info("updated datasets for project", project=project.name)
+        logger.info("Deleting datasets that no longer exist from db")
+        for dataset_name in list(to_delete):
+            Dataset.objects(name=dataset_name).delete()
+            logger.info("deleted dataset", dataset=dataset_name)
     logger.info("updated datasets for all projects")
 
 
@@ -109,9 +130,9 @@ def update_tables():
                         partitioning=table.partitioning_type
                     )
                     obj.save()
-                    logger.info("Added table %s to the database", table_name)
+                    logger.info("Added table to the database", table=table_name)
                 else:
                     obj = current_tables[table_name]
                     obj.update(**data)
-                    logger.info("Updated table %s", table_name)
+                    logger.info("Updated table", table=table_name)
     logger.info("All done")
