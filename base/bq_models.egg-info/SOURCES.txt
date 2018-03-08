@@ -1,0 +1,12 @@
+setup.py
+bq_models/__init__.py
+bq_models/credentials.py
+bq_models/dataset.py
+bq_models/internal.py
+bq_models/project.py
+bq_models/table.py
+bq_models.egg-info/PKG-INFO
+bq_models.egg-info/SOURCES.txt
+bq_models.egg-info/dependency_links.txt
+bq_models.egg-info/requires.txt
+bq_models.egg-info/top_level.txt
