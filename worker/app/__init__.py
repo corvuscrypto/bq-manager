@@ -7,11 +7,13 @@ import time
 
 from structlog import get_logger
 
-from app.config import Config
-from app.log_config import initialize as init_logger
-from app.processes import update_datasets, update_projects, update_tables
 from bq_models import initialize as init_conn
 from bq_models.internal import InternalState
+
+from app.config import Config
+from app.log_config import initialize as init_logger
+from app.processes import SchemaSynchronizer
+from app.google import get_client
 
 
 logger = get_logger(__name__)
@@ -26,6 +28,7 @@ def initialize():
 
 
 def main_loop():
+    synchronizer = SchemaSynchronizer(get_client())
     # check if internal status is there
     state = InternalState.objects.first()
     if state is None:
@@ -36,12 +39,7 @@ def main_loop():
             status="updating",
             last_refresh=datetime.datetime.now()
         )
-        logger.info("updating projects")
-        update_projects()
-        logger.info("updating datasets")
-        update_datasets()
-        logger.info("updating tables")
-        update_tables()
+        synchronizer.sync()
         state.update(
             status="idle",
         )
