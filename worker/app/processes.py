@@ -2,137 +2,28 @@
 Module to define process functions for better
 code separation.
 """
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
-from google.api_core.exceptions import NotFound
 from structlog import get_logger
 
-from app.google import get_client
-from bq_models.dataset import Dataset
-from bq_models.project import Project
-from bq_models.table import Table
+from app.processors.projects import ProjectProcessor
+from app.processors.datasets import DatasetProcessor
+from app.processors.tables import TableProcessor
+
 
 logger = get_logger(__name__)
 
 
-def update_projects():
-    client = get_client()
-    projects = client.list_projects()
-    for project in projects:
-        name = project.friendly_name
-        project_obj = Project.objects(name=name).first()
-        if project_obj is None:
-            project_obj = Project(name=name)
-            project_obj.save()
-            logger.info("Added project", project=name)
-    logger.info("Project info updated")
+class SchemaSynchronizer:
+    def __init__(self, client):
+        self.project_processor = ProjectProcessor(client)
+        self.dataset_processor = DatasetProcessor(
+            client,
+            self.project_processor
+        )
+        self.table_processor = TableProcessor(
+            client,
+            self.dataset_processor
+        )
 
-
-def list_datasets(client):
-    bq_datasets = client.list_datasets().__iter__()
-    try:
-        first = next(bq_datasets)
-    except NotFound:
-        raise StopIteration
-    yield first
-    for dataset in bq_datasets:
-        yield dataset
-
-
-def update_datasets():
-    client = get_client()
-    projects = Project.objects
-    for project in projects:
-        client.project = project.name
-        logger.info("fetching datasets for project", project=project.name)
-        current_datasets = {
-            x.name: x
-            for x in Dataset.objects(project=project.id)
-        }
-
-        # set of the keys that will in the end be used to
-        # know which datasets are removed
-        to_delete = {x for x in current_datasets.keys()}
-        bq_datasets = list_datasets(client)
-        for dataset in bq_datasets:
-            dataset = client.get_dataset(dataset)
-            data = {
-                "project": project.id,
-                "name": dataset.dataset_id,
-                "created": dataset.created,
-                "modified": dataset.modified
-            }
-            if dataset.dataset_id not in current_datasets:
-                obj = Dataset(
-                    **data
-                )
-                obj.save()
-                logger.info("Added dataset", dataset=dataset.dataset_id)
-            else:
-                # remove from delete set
-                to_delete.remove(data['name'])
-                obj = current_datasets[dataset.dataset_id]
-                obj.update(**data)
-                logger.info("Updated dataset", dataset=dataset.dataset_id)
-        logger.info("updated datasets for project", project=project.name)
-        logger.info("Deleting datasets that no longer exist from db")
-        for dataset_name in list(to_delete):
-            Dataset.objects(name=dataset_name).delete()
-            logger.info("deleted dataset", dataset=dataset_name)
-    logger.info("updated datasets for all projects")
-
-
-def get_table(client, table_ref):
-    table = client.get_table(table_ref)
-    return table
-
-
-def update_tables():
-    client = get_client()
-    datasets = Dataset.objects
-    project_name_by_id = {x.id: x.name for x in Project.objects}
-    for dataset in datasets:
-        project_name = project_name_by_id[dataset.project]
-        client.project = project_name
-        dataset_obj = client.dataset(dataset.name)
-        table_refs = client.list_dataset_tables(dataset_obj)
-        current_tables = {x.name: x for x in Table.objects(dataset=dataset.id)}
-        # maximum overdrive cap'n!!!!!
-        with ThreadPoolExecutor(max_workers=8) as executor:
-            futures = [
-                executor.submit(get_table, client, ref)
-                for ref in table_refs
-            ]
-            for future in as_completed(futures):
-                table = future.result()
-                table_name = table.table_id
-                data = {
-                    "project": dataset.project,
-                    "dataset": dataset.id,
-                    "name": table_name,
-                    "num_bytes": table.num_bytes,
-                    "num_records": table.num_rows,
-                    "schema": [x.to_api_repr() for x in table.schema],
-                    "created": table.created,
-                    "modified": table.modified,
-                    "partitioning": table.partitioning_type
-                }
-                if table_name not in current_tables:
-                    obj = Table(
-                        project=dataset.project,
-                        dataset=dataset.id,
-                        name=table_name,
-                        num_bytes=table.num_bytes,
-                        num_records=table.num_rows,
-                        schema=[x.to_api_repr() for x in table.schema],
-                        created=table.created,
-                        modified=table.modified,
-                        partitioning=table.partitioning_type
-                    )
-                    obj.save()
-                    logger.info("Added table to the database", table=table_name)
-                else:
-                    obj = current_tables[table_name]
-                    obj.update(**data)
-                    logger.info("Updated table", table=table_name)
-    logger.info("All done")
+    def sync(self):
+        logger.info("Synchronizing with BQ")
+        self.table_processor.sync()
